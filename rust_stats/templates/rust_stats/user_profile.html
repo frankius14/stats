@@ -1,0 +1,259 @@
+{% extends "rust_stats/base.html" %}
+{% load static %}
+
+
+{% block header_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.min.js" integrity="sha384-OZmxTjkv7EQo5XDMPAmIkkvywVeXw59YyYh6zq8UKfkbor13jS+5p8qMTBSA1q+F" crossorigin="anonymous"></script>
+<!-- <script src="https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.js" integrity="sha384-+jvb+jCJ37FkNjPyYLI3KJzQeD8pPFXUra3B/QJFqQ3txYrUPIP1eOfxK4h3cKZP" crossorigin="anonymous"></script> -->
+{% endblock %}
+
+{% block title %}{{title}}{% endblock %}
+
+
+{% block header_content %}
+<meta property="og:title" content="{{ ogp_title }}"/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="{{ request.build_absolute_uri }}"/>
+{% if avatar %}
+    <meta property="og:image" content="https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/{{avatar}}"/>
+{% else %}
+    <meta property="og:image" content="https://{{ request.get_host }}{% static 'rust_stats/images/ogp_default.png' %}"/>
+{% endif %}
+{% include "rust_stats/loading_animation.html" %}
+{% endblock %}
+
+{% block content %}
+
+
+
+<div id="user-profile-card">
+    <div class="row" id="user-stats">
+
+        <div class="col d-block d-md-none search-mobile search-box">
+            <form action="" method="post">
+                {% csrf_token %}
+                {{ form.search_q.errors|striptags }}
+                <div class="inner-addon left-addon"><i class="fas fa-search"></i>
+                    <input @focus="isSearchActive = true" @blur="isSearchActive = false" required name="search_q" autocomplete="off" type="search" class="profile-search searchDesktop" placeholder="Search profiles">
+                </div>
+                <transition name="slide-fade">
+                    <div v-show="isSearchActive" class="bg-primary search-examples">
+                        <div class="col text-truncate"><span>Search examples:</span></div>
+                            <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>https://steamcommunity.com/profiles/76561197992746895</span></div>
+                            <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>https://steamcommunity.com/id/Helkster</span></div>
+                            <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>76561197992746895</span></div>
+                    </div>
+                </transition>
+            </form>
+
+        </div>
+        <div v-if="user && user.success" class="col col-12 col-sm-12 col-md-4 col-lg-3" id="user-details">
+            <div class="row">
+                <div class="col">
+                    <h3 class="text-truncate profile-user-name">!{user.user_name}&nbsp;</h3>
+                    <img class="img-fluid w-100" :src="`https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/` + user.avatar" alt="Profile Picture">
+                    <a :href="`https://steamcommunity.com/profiles/` + steamid" target="_blank" rel="noreferrer">
+                        <div class="bg-secondary text-white view-external">
+                            <i class="fab fa-steam" style="margin-right: 6px;font-size: 21px;"></i>View on Steam
+                        </div>
+                    </a>
+                </div>
+            </div>
+            <div id="update-notice" class="bg-secondary">
+                <span v-if="last_update == 'Invalid date'">Never Updated</span>
+                <span v-else>Updated !{last_update} ago</span>
+            </div>
+
+            {% if request.user.is_staff %}
+                <a v-if="!user.is_banned" @click="banUser($event, 'ban')" @click.prevent href="#">
+                    <div class="bg-secondary admin-button">
+                        <span>Ban user</span>
+                    </div>
+                </a>
+                <a v-if="user.is_banned" @click="banUser($event, 'unban')" @click.prevent href="#">
+                    <div class="bg-secondary admin-button">
+                        <span>Unban user</span>
+                    </div>
+                </a>
+
+                <a @click="deleteUser()" @click.prevent href="#">
+                    <div class="bg-secondary admin-button">
+                        <span>Delete user</span>
+                    </div>
+                </a>
+            {% endif %}
+            
+            <div class="row">
+                <div class="col">
+                    <div class="bg-secondary friends-label">
+                        <span v-if="friends && friends.success && !(friendsNum == 0)">!{friendsNum} Friend!{friendsNum == 1 ? "" : "s"} on RustStats.gg</span>
+                        <span v-else-if="!friends">Loading friends...</span>
+                        <span v-else>No friends on RustStats.gg</span>
+                    </div>
+                    <div v-if="friends && friends.success && !(friendsNum == 0)" class="overflow-auto scrollbar">
+                        
+                        
+                        <div v-for="friend in friends.friends" class="row friends-row hover-dim bg-primary">
+                            <div class="col">
+                                <a :href="`/rust-stats/user/` + friend.user_id" style="text-decoration: none;">
+                                    <div class="row">
+                                        <div class="col col-3 col-md-4">
+                                            <img class="img-fluid" :src="`https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/` + friend.avatar" alt="Profile Picture">
+                                        </div>
+                                        <div class="col friend-name col-9 col-md-8">
+                                            <div class="text-truncate"><span>!{friend.user_name}</span></div>
+                                            <div v-if="friend.hours_played && !friend.hours_played == 0" class="friends-hours"><span class="text-truncate">!{friend.hours_played} hours</span></div>
+                                            <div v-else class="friends-hours"><span class="text-truncate">Private hours</span></div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+        <div v-if="user && user.success" class="col">
+
+            <div class="row d-none d-md-block search-box">
+                <form action="" method="post">
+                    {% csrf_token %}
+                    
+                    <div class="col" class="search-box">
+                        {{ form.search_q.errors|striptags }}
+                        <div class="inner-addon left-addon"><i class="fas fa-search"></i>
+                            <input @focus="isSearchActive = true" @blur="isSearchActive = false" required name="search_q" autocomplete="off" type="search" class="profile-search" placeholder="Search by pasting link to a profile or login with Steam">
+                        </div>
+                        <transition name="slide-fade">
+                            <div v-show="isSearchActive" class="bg-primary search-examples">
+                                <div class="col text-truncate"><span>Search examples:</span></div>
+                                <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>https://steamcommunity.com/profiles/76561197992746895</span></div>
+                                <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>https://steamcommunity.com/id/Helkster</span></div>
+                                <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>76561197992746895</span></div>
+                            </div>
+                        </transition>
+                    </div>
+                </form>
+            </div>
+
+            
+            <div v-if="wasPublicIsPrivate" class="row stats-card">
+                <div class="col">
+                    <div class="bg-secondary card-name stats-text"><i class="fas fa-exclamation-triangle text-warning" style="margin-right: 8px;"></i><span class="text-warning">Private Profile</span><span class="float-right d-none d-sm-block private-profile">Updated !{last_update} ago</span></div>
+                    <div class="row stats-row">
+                        <div class="col card-name stats-text private-profile">
+                            <p>This profile is now private but we have a record of it from !{last_update} ago. Please <a href="https://steamcommunity.com/id/profile/edit/settings" target="_blank" rel="noreferrer" style="text-decoration: underline;">set it to public</a>. Refresh the page in 2-5 minutes to see the updated stats. Last attempted update was !{last_attempt} ago.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="!user.last_successful_update" class="row stats-card">
+
+                <div class="col col-12">
+                    <div class="bg-secondary card-name stats-text"><i class="fas fa-exclamation-triangle text-danger" style="margin-right: 8px;"></i><span
+                            class="text-danger">Private Profile</span><span class="float-right d-none d-lg-block private-profile">Attempted to update !{last_attempt} ago</span></div>
+                    <div class="row stats-row">
+                        <div class="col card-name stats-text private-profile">
+                            <p>This profile is private or has never played Rust. Please <a href="https://steamcommunity.com/id/profile/edit/settings" target="_blank" rel="noreferrer" style="text-decoration: underline;">set it to public</a> and refresh the page in 2-5 minutes to see your stats.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row stats-card">
+
+                <div class="col">
+                    <div class="bg-secondary card-name stats-text"><span>Profile Overview</span></div>
+                    <div class="row stats-row">
+                        <div class="col card-stats stats-text col-12 col-lg-6">
+                            <div class="card-content">
+                                <div class="stats-heading stats-heading-large"><span>Hours Played</span></div>
+                                <div class="stats-value stats-value-large"><span>!{user.hours_played}</span></div>
+                            </div>
+                        </div>
+                        <div class="col card-stats stats-text col-12 col-lg-6">
+                            <div class="card-content">
+                                <div class="stats-heading stats-heading-large"><span>Account Created</span></div>
+                                <div class="stats-value stats-value-large"><span>!{user.account_created}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="user.last_successful_update" class="row">
+
+                {% for category in categories %}
+                    {% if category.isWide %}
+                            <div class="col col-12 stats-card">
+                                <div class="bg-secondary card-name stats-text"><span>{{ category.topic }}</span></div>
+
+                                <div class="row stats-row">
+                                    {% for stats_unit in category.stats %}
+                                    <div class="col card-stats stats-text col-6 col-lg-3">
+                                        <div class="card-content">
+                                            <div class="stats-heading"><span>{{ stats_unit.verbose_name }}</span></div>
+                                            <div class="stats-value"><span>{{ stats_unit.value }}</span></div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                    {% else %}
+                        <div class="col col-12 col-lg-6 left-column double-column">
+                            <div class="bg-secondary card-name stats-text"><span>{{ category.topic }}</span></div>
+                            <div class="row stats-row">
+                                {% for stats_unit in category.stats %}
+                                <div class="col card-stats stats-text col-6">
+                                    <div class="card-content">
+                                        <div class="stats-heading"><span>{{ stats_unit.verbose_name }}</span></div>
+                                        <div class="stats-value"><span>{{ stats_unit.value }}</span></div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+
+        <div v-if="user && !user.success" class="col col-12">
+            <form action="" method="post">
+                {% csrf_token %}
+                <div class="row d-none d-md-block search-box">
+                    <div class="col" class="search-box">
+                        {{ form.search_q.errors|striptags }}
+                        <div class="inner-addon left-addon"><i class="fas fa-search"></i>
+                            <input @focus="isSearchActive = true" @blur="isSearchActive = false" required name="search_q" autocomplete="off" type="search" class="profile-search" placeholder="Search by pasting link to a profile or login with Steam">
+                        </div>
+                        <transition name="slide-fade">
+                            <div v-show="isSearchActive" class="bg-primary search-examples">
+                                <div class="col text-truncate"><span>Search examples:</span></div>
+                                <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>https://steamcommunity.com/profiles/76561197992746895</span></div>
+                                <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>https://steamcommunity.com/id/Helkster</span></div>
+                                <div class="col text-truncate"><i class="fas fa-check text-success" style="margin-right: 0.5em;"></i><span>76561197992746895</span></div>
+                            </div>
+                        </transition>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div v-if="user && !user.success" class="col col-12 text-center error-description-small">
+            <span>User does not exist or has never played Rust</span>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+
+{% block footer_scripts %}
+<script type="text/javascript" src="{% static 'rust_stats/js/user_profile_render.js' %}"></script>
+{% endblock %}

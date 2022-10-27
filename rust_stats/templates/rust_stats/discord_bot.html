@@ -1,0 +1,24 @@
+{% extends "rust_stats/base.html" %}
+{% load static %}
+
+{% block title %}Rust Stats Discord Bot | RustStats.gg{% endblock %}
+{% block page_description %}Rust Stats Discord Bot allows you to view anyone's Rust Stats in your own Discord server.{% endblock %}
+
+{% block content %}
+<div>
+        <div class="container">
+            <div class="row">
+                <div class="col text-center" style="font-size: 2.5em; margin: 1em 1em;">
+                <a href="/invite-bot" target="_blank">
+                    <span class="text-center">Click here to invite bot to your server</span></div>
+                </a>
+            </div>
+            <div class="row">
+                    <div class="col text-center"><img src="{% static 'rust_stats/images/bot_example.gif' %}"></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block footer %}
+{% endblock %}
